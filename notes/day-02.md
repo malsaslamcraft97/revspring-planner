@@ -102,3 +102,60 @@ Each layer changes for a different reasons
 - Modules changes when the reorganization of features (split into sub-modules, new dependencies)
 
 As all of them are separate, change to one rarely hampers others
+
+## Dependency Injection
+
+DI is the part that takes longest to internalize or understand because it looks like a magic. The trick is simpler:
+
+- Classes declare what they need, instead of constructing it
+- Container provided the instances required by the classes, by looking them up in a Map.
+
+### Without DI
+
+```javascript
+class TasksController {
+  private service = new TasksService();
+}
+```
+
+It looks innocent, but problems showup later:
+
+- How to test the controller without the real service?
+- How to swap the in-memory service with database-backed one, in case we are using a DB.
+
+Here, the issue is the controller being tighly-coupled to a specfic service or implementation
+
+### DI way
+
+```javascript
+class TasksController {
+  constructor(private readonly service: TasksService)
+}
+```
+
+Here, The controller no longer constructs the service — it declares _"I need a TasksService"_ via its constructor signature. Something else is responsible for handing one in. That something is Nest's **DI container**.
+
+### How the container actually works
+
+At its core, the container is a **Map<token, instance>**. When Nest starts, it looks up your module graph, sees every class in providers, and registers it:
+
+```javascript
+container = {
+  TasksService     → <TasksService instance>,
+  LoggerService    → <LoggerService instance>,
+  TasksController  → <TasksController instance>,
+}
+```
+
+When it needs to construct TasksController, it reads the constructor parameter types, sees it needs a TasksService, looks up that key in the map, and passes the instance to new TasksController(...). Every dependency is resolved by token lookup.
+
+### How Nest knows the constructor needs a particular service?
+
+This is where decorators and TypeScript cooperate. With _emitDecoratorMetadata: true_ in your tsconfig.json, TypeScript writes constructor parameter types into a hidden metadata table on the class at compile time. Nest reads that table at runtime using the **reflect-metadata** library:
+
+```javascript
+Reflect.getMetadata('design:paramtypes', TasksController);
+// → [class TasksService]
+```
+
+That's the entire mechanism. The decorator (**@Injectable()**, **@Controller()**) is the trigger that tells TypeScript _"this class participates in DI, write its types down."_ Without **emitDecoratorMetadata**, that table is empty, and Nest has no idea what to inject. This is exactly why we needed **SWC** over **esbuild** in your **Vitest** setup — esbuild doesn't emit this metadata correctly, which would silently break every test that relies on DI.
