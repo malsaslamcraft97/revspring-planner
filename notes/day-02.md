@@ -103,7 +103,7 @@ Each layer changes for a different reasons
 
 As all of them are separate, change to one rarely hampers others
 
-## Dependency Injection
+## 2. Dependency Injection
 
 DI is the part that takes longest to internalize or understand because it looks like a magic. The trick is simpler:
 
@@ -159,3 +159,71 @@ Reflect.getMetadata('design:paramtypes', TasksController);
 ```
 
 That's the entire mechanism. The decorator (**@Injectable()**, **@Controller()**) is the trigger that tells TypeScript _"this class participates in DI, write its types down."_ Without **emitDecoratorMetadata**, that table is empty, and Nest has no idea what to inject. This is exactly why we needed **SWC** over **esbuild** in your **Vitest** setup — esbuild doesn't emit this metadata correctly, which would silently break every test that relies on DI.
+
+## 3. Decorators & Metadata
+
+Decorators are relatively new to **JavaScript** world and they feel like similar to **Python** annotations which is not true. _A decorator is a function that gets called when the class is defined, and it's only job is to attach the metadata to the class_. The metadata attached, gets read later by the framework i.e. NestJS in our case to make decisions about the behavior.
+
+### What a decorator actually is (Custom Decorator)
+
+```javascript
+function MyDecorator(target: any) {
+  Reflect.defineMetadata('my:flag', true, target);
+}
+
+@MyDecorator
+class Foo {}
+
+Reflect.getMetadata('my:flag', Foo); // → true
+```
+
+That's it. The decorator doesn't transform Foo, doesn't rewrite its constructor, doesn't generate code. It runs once at class-definition time and writes a key-value pair into a hidden table. Anyone with a reference to Foo can read that table later.
+
+### 3 kinds of Decorators in Nest
+
+#### Class Decorators
+
+- **@Controller**: This controller is mounted at _/tasks_
+- **@Injectable**: This is injectable
+- **@Module**: This module contains these providers
+
+#### Method Decorators
+
+**@Get**, **@Post**, **@Delete** as per the request methods. Internally, Nest scans the controller class at the startup, reads each methods metadata, and builds the route table.
+
+#### Parameter Decorators
+
+**@Body**, **@Query**, **@Param** as per the request, Nest reads the parameter metadata and pulls the right value out of the request object.
+
+### Composable Decorators
+
+Multiple decorators stack on the same target:
+
+```javascript
+@Controller('tasks')      // class decorator: route prefix
+export class TasksController {
+  @Get(':id')             // method decorator: GET /tasks/:id
+  findOne(
+    @Param('id') id: string,   // parameter decorator: extract URL param
+  ): Task {
+    return this.service.findOne(id);
+  }
+}
+```
+
+Each decorator runs independently and writes its own metadata key. Nest reads all of them at startup to wire up routing, parameter extraction, validation pipes, guards, interceptors — everything.
+
+### Mental Paradigm
+
+Coming from React or Express, you're used to behavior being defined by what you do — call this function, return this value, await this promise. Decorators flip that: _behavior is defined by what you declare_. **@Get(':id')** doesn't do anything by itself; it just marks the method. Nest is the one that later says _"Aha, this method is marked as a **GET** handler, let me route requests to it."_
+
+This is the same pattern as HTML attributes.
+
+```html
+<input type="email" />
+```
+
+It doesn't do anything on its own — the browser reads the attribute and decides to render an email input with built-in validation. Decorators are runtime attributes on classes.
+Here's a quick visual of how the three pieces fit together at runtime:
+
+![NestJS Mental Paradigm](nest-mental-paradigm.png)
