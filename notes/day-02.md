@@ -25,11 +25,11 @@ The main difference between the Express (Most popular Node framework) vs NestJS 
 
 A module is a class decorated **_@Module()_** that groups features that are related. It declares, what's inside controllers and services and what it should export to the other modules. By default, when a new Nest app is created it has **AppModule**, later when each feature is added, then it added **TasksModule**, **AuthModule**, **UsersModule**
 
-**Mental model:** A module is a _boundary_. Everything inside it, shares a DI (Dependancy Injection) scope. To use anything from another module, that particular module should have that item exported and we need to explicitly import the module.
+**Mental model:** A module is a _boundary_. Everything inside it, shares a DI (Dependency Injection) scope. To use anything from another module, that particular module should have that item exported and we need to explicitly import the module.
 
 The four keys in module:
 
-```javascript
+```typescript
 @Module({
     imports: [], // other modules that are exported that I want to use in this module
     controllers: [], // classes that handle the incoming HTTP requests
@@ -44,7 +44,7 @@ A controller's job is simple, whenever a HTTP request is received just parse the
 
 Ideally, controllers should be boring and shouldn't have any business logic written inside them.
 
-```javascript
+```typescript
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
@@ -76,7 +76,7 @@ The services is the place where the business logic lives. They're plain classes 
 
 This is also one of the best things that makes them easier to test, as we don't need to spin up a HTTP server to verify your validation logic.
 
-```javascript
+```typescript
 @Injectable()
 export class TasksService {
   private tasks: Task[] = [];
@@ -112,7 +112,7 @@ DI is the part that takes longest to internalize or understand because it looks 
 
 ### Without DI
 
-```javascript
+```typescript
 class TasksController {
   private service = new TasksService();
 }
@@ -123,11 +123,11 @@ It looks innocent, but problems showup later:
 - How to test the controller without the real service?
 - How to swap the in-memory service with database-backed one, in case we are using a DB.
 
-Here, the issue is the controller being tighly-coupled to a specfic service or implementation
+Here, the issue is the controller being tightly-coupled to a specfic service or implementation
 
 ### DI way
 
-```javascript
+```typescript
 class TasksController {
   constructor(private readonly service: TasksService)
 }
@@ -139,11 +139,11 @@ Here, The controller no longer constructs the service — it declares _"I need a
 
 At its core, the container is a **Map<token, instance>**. When Nest starts, it looks up your module graph, sees every class in providers, and registers it:
 
-```javascript
+```typescript
 container = {
-  TasksService     → <TasksService instance>,
-  LoggerService    → <LoggerService instance>,
-  TasksController  → <TasksController instance>,
+    TasksService: <TasksService instance>,    // resolved by token
+    LoggerService: <LoggerService instance>,
+    TasksController: <TasksController instance>,
 }
 ```
 
@@ -153,7 +153,7 @@ When it needs to construct TasksController, it reads the constructor parameter t
 
 This is where decorators and TypeScript cooperate. With _emitDecoratorMetadata: true_ in your tsconfig.json, TypeScript writes constructor parameter types into a hidden metadata table on the class at compile time. Nest reads that table at runtime using the **reflect-metadata** library:
 
-```javascript
+```typescript
 Reflect.getMetadata('design:paramtypes', TasksController);
 // → [class TasksService]
 ```
@@ -166,7 +166,7 @@ Decorators are relatively new to **JavaScript** world and they feel like similar
 
 ### What a decorator actually is (Custom Decorator)
 
-```javascript
+```typescript
 function MyDecorator(target: any) {
   Reflect.defineMetadata('my:flag', true, target);
 }
@@ -199,12 +199,12 @@ That's it. The decorator doesn't transform Foo, doesn't rewrite its constructor,
 
 Multiple decorators stack on the same target:
 
-```javascript
-@Controller('tasks')      // class decorator: route prefix
+```typescript
+@Controller('tasks') // class decorator: route prefix
 export class TasksController {
-  @Get(':id')             // method decorator: GET /tasks/:id
+  @Get(':id') // method decorator: GET /tasks/:id
   findOne(
-    @Param('id') id: string,   // parameter decorator: extract URL param
+    @Param('id') id: string, // parameter decorator: extract URL param
   ): Task {
     return this.service.findOne(id);
   }
