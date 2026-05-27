@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Task, TaskStatus } from './task.interface';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -19,6 +19,16 @@ export class TasksService {
       status: TaskStatus.OPEN,
     };
     this.tasks.push(task);
+    return task;
+  }
+
+  getTaskById(id: string): Task {
+    const task = this.tasks.find((t) => t.id === id);
+
+    if (!task) {
+      throw new NotFoundException(`Task with ${id} not found`);
+    }
+
     return task;
   }
 }
