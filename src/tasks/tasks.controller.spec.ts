@@ -8,6 +8,7 @@ describe('TasksController', () => {
   let controller: TasksController;
   let tasksService: {
     getAllTasks: ReturnType<typeof vi.fn>;
+    getTaskById: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
